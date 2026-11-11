@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+
+# Reference: https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797
+
+# Support backgrounds?
+echoc() {
+    if [[ "$1" == "--test" ]]; then
+        echoc "I'm in " -red "red" -reset " (red)"
+        echoc "I'm in " -lightred "lightred" -reset " (lightred)"
+        echoc "I'm in " -green "green" -reset " (green)"
+        echoc "I'm in " -lightgreen "lightgreen" -reset " (lightgreen)"
+        echoc "I'm in " -yellow "yellow" -reset " (yellow)"
+        echoc "I'm in " -darkyellow "darkyellow" -reset " (darkyellow or orange)"
+        echoc "I'm in " -blue "blue" -reset " (blue)"
+        echoc "I'm in " -lightblue "lightblue" -reset " (lightblue)"
+        echoc "I'm in " -purple "purple" -reset " (purple or magenta)"
+        echoc "I'm in " -lightpurple "lightpurple" -reset " (lightpurple or lightmagenta)"
+        echoc "I'm in " -cyan "cyan" -reset " (cyan)"
+        echoc "I'm in " -lightcyan "lightcyan" -reset " (lightcyan)"
+        echoc "I'm in " -white "white" -reset " (white)"
+        echoc "I'm in " -lightgray "lightgray" -reset " (lightgray or lightgrey)"
+        echoc "I'm in " -black "black" -reset " (black)"
+        echoc "I'm in " -darkgray "darkgray" -reset " (darkgray or darkgrey)"
+        echo
+        echoc "I'm in a " -redbg "red background" -reset " (redbg)"
+        echoc "I'm in a " -greenbg "green background" -reset " (greenbg)"
+        echoc "I'm in a " -yellowbg "yellow background" -reset " (yellowbg)"
+        echoc "I'm in a " -bluebg "blue background" -reset " (bluebg)"
+        echoc "I'm in a " -purplebg "purple background" -reset " (purple or magentabg)"
+        echoc "I'm in a " -cyanbg "cyan background" -reset " (cyanbg)"
+        echoc "I'm in a " -whitebg "white background" -reset " (whitebg)"
+        echoc "I'm in a " -blackbg "black background" -reset " (blackbg)"
+        echo
+        echoc "I'm an " -error "error" -reset " (error) message"
+        echoc "I'm a " -warning "warning" -reset " (warning) message"
+        echoc "I'm a " -warn "warn" -reset " (warn) message"
+        echoc "I'm an " -info "info" -reset " (info) message"
+        echoc "I'm an " -information "information" -reset " (information) message"
+        echoc "I'm a " -debug "debug" -reset " (debug) message"
+        echo
+        echoc "I'm a " -header "header" -reset " (header or heading)"
+        echoc "I'm a " -subheader "subheader" -reset " (subheader or subheading)"
+        echo
+        echoc "I'm " -bold "bold" -reset " (bold)"
+        echoc "I'm " -dim "dim" -reset " (dim or faint)"
+        echoc "I'm " -italic "italic" -reset " (italic)"
+        echoc "I'm " -underline "underline" -reset " (underline)"
+        echoc "I'm " -blinking "blinking" -reset " (blinking)"
+        echoc "I'm " -inverse "inverse" -reset " (inverse or reverse)"
+        echoc "I'm " -hidden "hidden" -reset " (hidden or invisible)"
+        echoc "I'm " -strikethrough "strikethrough" -reset " (strikethrough)"
+
+        exit 0
+    fi
+
+    # Constants
+    local _reset='\033[0m'
+    local _nocolor='\033[39;49;22m'
+    local _nocolorfg='\033[39m'
+    local _nocolorbg='\033[49m'
+
+    # Foreground Colors
+    local _red='\033[0;31m'
+    local _lightred='\033[1;31m'
+    local _green='\033[0;32m'
+    local _lightgreen='\033[1;32m'
+    local _yellow='\033[1;33m'
+    local _darkyellow='\033[0;33m'
+    local _blue='\033[0;34m'
+    local _lightblue='\033[1;34m'
+    local _purple='\033[0;35m'
+    local _lightpurple='\033[1;35m'
+    local _cyan='\033[0;36m'
+    local _lightcyan='\033[1;36m'
+    local _lightgray='\033[0;37m'
+    local _white='\033[1;37m'
+    local _black='\033[0;30m'
+    local _darkgray='\033[1;30m'
+
+    # Backround Colors
+    local _redbg='\033[41m'
+    local _greenbg='\033[42m'
+    local _yellowbg='\033[43m'
+    local _bluebg='\033[44m'
+    local _purplebg='\033[45m'
+    local _cyanbg='\033[46m'
+    local _whitebg='\033[47m'
+    local _blackbg='\033[40m'
+
+    # Modifiers
+    local _bold='\033[1m'
+    local _nobold='\033[22m'
+    local _dim='\033[2m'
+    local _nodim='\033[22m'
+    local _italic='\033[3m'
+    local _noitalic='\033[23m'
+    local _underline='\033[4m'
+    local _nounderline='\033[24m'
+    local _blinking='\033[5m'
+    local _noblinking='\033[25m'
+    local _inverse='\033[7m'
+    local _noinverse='\033[27m'
+    local _hidden='\033[8m'
+    local _nohidden='\033[28m'
+    local _strikethrough='\033[9m'
+    local _nostrikethrough='\033[29m'
+
+    # Variables
+    local skip_newline=false
+    local skip_reset=false
+
+    for arg in "$@"; do
+        case $(echo "$arg" | tr '[:upper:]' '[:lower:]') in
+            # Reset codes
+            -reset) echo -en "$_reset" ;;
+            -nocolor) echo -en "$_nocolor" ;;
+            -nocolorfg|-nofg) echo -en "$_nocolorfg" ;;
+            -nocolorbg|-nobg) echo -en "$_nocolorbg" ;;
+
+            # Foreground Colors
+            -red) echo -en "$_red" ;;
+            -lightred) echo -en "$_lightred" ;;
+            -green) echo -en "$_green" ;;
+            -lightgreen) echo -en "$_lightgreen" ;;
+            -yellow) echo -en "$_yellow" ;;
+            -darkyellow|-orange) echo -en "$_darkyellow" ;;
+            -blue) echo -en "$_blue" ;;
+            -lightblue) echo -en "$_lightblue" ;;
+            -purple|-magenta) echo -en "$_purple" ;;
+            -lightpurple|-lightmagenta) echo -en "$_lightpurple" ;;
+            -cyan) echo -en "$_cyan" ;;
+            -lightcyan) echo -en "$_lightcyan" ;;
+            -lightgray|-lightgrey) echo -en "$_lightgray" ;;
+            -white) echo -en "$_white" ;;
+            -black) echo -en "$_black" ;;
+            -darkgray|-darkgrey) echo -en "$_darkgray" ;;
+
+            # Backround Colors
+            -redbg) echo -en "$_redbg" ;;
+            -greenbg) echo -en "$_greenbg" ;;
+            -yellowbg) echo -en "$_yellowbg" ;;
+            -bluebg) echo -en "$_bluebg" ;;
+            -purplebg|-magentabg) echo -en "$_purplebg" ;;
+            -cyanbg) echo -en "$_cyanbg" ;;
+            -whitebg) echo -en "$_whitebg" ;;
+            -blackbg) echo -en "$_blackbg" ;;
+
+            # Modifiers
+            -bold) echo -en "$_bold" ;;
+            -nobold) echo -en "$_nobold" ;;
+            -dim|-faint) echo -en "$_dim" ;;
+            -nodim|-nofaint) echo -en "$_nodim" ;;
+            -italic) echo -en "$_italic" ;;
+            -noitalic) echo -en "$_noitalic" ;;
+            -underline) echo -en "$_underline" ;;
+            -nounderline) echo -en "$_nounderline" ;;
+            -blinking) echo -en "$_blinking" ;;
+            -noblinking) echo -en "$_noblinking" ;;
+            -inverse|-reverse) echo -en "$_inverse" ;;
+            -noinverse|-noreverse) echo -en "$_noinverse" ;;
+            -hidden|-invisible) echo -en "$_hidden" ;;
+            -nohidden|-noinvisible) echo -en "$_nohidden" ;;
+            -strikethrough) echo -en "$_strikethrough" ;;
+            -nostrikethrough) echo -en "$_nostrikethrough" ;;
+
+            # Special definitions
+            -header|-heading) echo -en "$_blue" ;; # blue
+            -subheader|-subheading) echo -en "$_cyan" ;; # cyan
+            -error) echo -en "$_red" ;; # red
+            -warning|-warn) echo -en "$_darkyellow" ;; # orange
+            -information|-info) echo -en "$_nocolor" ;; # nocolor
+            -debug) echo -en "$_darkgray" ;; # darkgray
+
+            # Switches
+            -n|--skip-newline) skip_newline=true ;;
+            --skip-reset) skip_reset=true ;;
+
+            # Else
+            *) echo -n "$arg" ;;
+        esac
+    done
+
+    if ! $skip_reset; then
+        echo -en '\033[0m'
+    fi
+
+    if ! $skip_newline; then
+        echo
+    fi
+}
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    echoc --test
+fi

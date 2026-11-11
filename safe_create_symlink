@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+
+source "$(dirname "${BASH_SOURCE[0]}")/echoc"
+source "$(dirname "${BASH_SOURCE[0]}")/abspath"
+
+function safe_create_symlink {
+    local dry_run=false
+	local no_backup=false
+    local extension=$(date +"%Y%m%d.%H%M")
+    local positional_args=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+			--no-backup)
+				no_backup=true
+				shift
+				;;
+            --extension|--ext)
+                if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
+                    extension="$2"
+                    shift 2
+                else
+                    echoc -error "Error: Argument for $1 is missing"
+                    exit 1
+                fi
+                ;;
+            --dry-run)
+                dry_run=true
+                shift
+                ;;
+            *)
+                positional_args+=("$1")
+                shift
+                ;;
+        esac
+    done
+
+    set -- "${positional_args[@]}" # restore positional parameters
+
+    local lead=""
+    if $dry_run; then
+        lead="(dry-run) "
+    fi
+
+    local src="$(abspath "$1")"
+    local target="$(abspath "$2")"
+
+	if [[ ! -e "$src" ]]; then
+		echoc -purple "$lead" -error "Source file ${src} does not exist"
+		return 1
+	fi
+
+	# local src_path="$(dirname "$src")"
+	# local src_name="$(basename "$src")"
+	# local target_path="$(dirname "$target")"
+	# local target_name="$(basename "$target")"
+    # local relative_src_path="$(relative_path "$target_path" "$src_path")"
+	# src="${relative_src_path}/${src_name}"
+
+	# echo "src_name = $src_name"
+	# echo "src_path = $src_path"
+	# echo "target_name = $target_name"
+	# echo "target_path = $target_path"
+	# echo "relative_src_path = $relative_src_path"
+	# echo "src = $src"
+	# echo "target = $target"
+
+	if [[ -L "$target" || -e "$target" ]]; then
+		if [[ -L "$target" && "$(readlink -f "$src")" == "$(readlink -f "$target")" ]]; then
+			echoc -purple "$lead" -nocolor "Link " -yellow "$target" -nocolor " already exists; skipping"
+			return 0
+		fi
+
+		if $no_backup; then
+			echoc -purple "$lead" -nocolor "Deleting " -yellow "$target"
+			if ! $dry_run; then
+				rm -rf "$target"
+			fi
+		else
+			echoc -purple "$lead" -nocolor "Moving " -yellow "$target" -nocolor " to " -yellow "${target}.${extension}"
+			if ! $dry_run; then
+				mv "$target" "${target}.${extension}"
+			fi
+		fi
+	fi
+
+	echo -purple "$lead" -nocolor "Creating link from " -yellow "$src" -nocolor " to " -yellow "$target"
+	if ! $dry_run; then
+		ln -sn "$src" "$target"
+	fi
+	return $?
+}

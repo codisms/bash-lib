@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+function abspath {
+    local target="$1"
+
+    # 1. Manually expand tilde (~) if present
+    if [[ "$target" == "~"* ]]; then
+        target="${HOME}${target#\~}"
+    fi
+
+    # 2. If the exact target exists (as a file, folder, OR symlink),
+    #    handle it directly without peeling it apart.
+    if [ -e "$target" ] || [ -L "$target" ]; then
+        if [ -d "$target" ]; then
+            # Existing directory/symlink to directory
+            echo "$(cd "$target" && pwd)"
+        else
+            # Existing file/symlink to file
+            local base
+            base=$(dirname "$target")
+            echo "$(cd "$base" && pwd)/$(basename "$target")"
+        fi
+        return
+    fi
+
+    # 3. Walk backward if the target does not exist at all
+    local base="$target"
+    local sub=""
+    while [ ! -d "$base" ] && [ ! -L "$base" ] && [ "$base" != "/" ] && [ "$base" != "." ]; do
+        sub="$(basename "$base")/${sub}"
+        base="$(dirname "$base")"
+    done
+
+    # 4. Resolve the existing anchor logically (preserving symlinks)
+    local resolved_base
+    resolved_base=$(cd "$base" 2>/dev/null && pwd)
+
+    # 5. Combine and clean up trailing or duplicate slashes
+    local full_path="${resolved_base}/${sub}"
+    full_path=$(echo "$full_path" | tr -s '/' | sed 's/\/$//')
+
+    echo "$full_path"
+}
