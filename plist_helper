@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+
+#set -e # stop on error
+
+CHECK_ARGS=()
+POSITIONAL_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+		--debug)
+			set -xv
+			CHECK_ARGS+=("$1")
+			shift
+			;;
+		*)
+			POSITIONAL_ARGS+=("$1")
+			shift
+			;;
+	esac
+done
+
+set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+
+# Check if echoc is available; we use it here
+command -v echoc &> /dev/null || export PATH="$(dirname "${BASH_SOURCE[0]}"):$PATH"
+
+# check_tool_deps "${CHECK_ARGS[@]}" && exit 1
+
+
+PLIST_FILE="$1"
+ACTION="$2"
+KEY="$3"
+KEY_TYPE="$4"
+KEY_VALUE="$5"
+
+if [[ -z "$PLIST_FILE" ]]; then
+	echoc -error "Filename is missing"
+	exit 1
+fi
+
+if [[ -z "$ACTION" ]]; then
+	echoc -error "ACTION is missing"
+	exit 1
+fi
+ACTION=$(echo "$ACTION" | tr '[:upper:]' '[:lower:]')
+if ! [[ "$ACTION" =~ ^(set|get|delete|dump|print)$ ]]; then
+	echoc -error "Invalid ACTION '${ACTION}' specified"
+	exit 1
+fi
+
+if [[ -z "$KEY" ]] && [[ "$ACTION" =~ ^(set|get|delete)$ ]]; then
+	echoc -error "KEY is missing"
+	exit 1
+fi
+
+if [[ "$ACTION" == "set" ]]; then
+	if [[ -z "$KEY_TYPE" ]]; then
+		echoc -error "Missing type"
+		exit 1
+	fi
+	case "$KEY_TYPE" in
+		bool|boolean)
+			KEY_VALUE=$(echo "$KEY_VALUE" | tr '[:upper:]' '[:lower:]')
+			if [[ "$KEY_VALUE" =~ ^(true|1|yes)$ ]]; then
+				KEY_VALUE=true
+			elif [[ "$KEY_VALUE" =~ ^(false|0|no)$ ]]; then
+				KEY_VALUE=false
+			else
+				echoc -error "Invalid value of '${KEY_VALUE}' for type 'bool'"
+				exit 1
+			fi
+			KEY_TYPE=bool
+			;;
+		string) ;; # No checks
+		real)
+			if ! [[ "$KEY_VALUE" =~ ^[+-]?[0-9.]+$ ]]; then
+				echoc -error "Invalid value of '${KEY_VALUE}' for type 'real'"
+				exit 1
+			fi
+			;;
+		integer)
+			if ! [[ "$KEY_VALUE" =~ ^[+-]?[0-9]+$ ]]; then
+				echoc -error "Invalid value of '${KEY_VALUE}' for type 'integer'"
+				exit 1
+			fi
+			;;
+		date)
+			if ! date -d "$KEY_VALUE" >/dev/null 2>&1; then
+				echoc -error "Invalid value of '${KEY_VALUE}' for type 'date'"
+				exit 1
+			fi
+			;;
+		array) ;; # Don't know how to verify this
+		dict) ;; # Don't know how to verify this
+		data) ;; # Don't know how to verify this
+		*)
+			echoc -error "Invalid KEY type '${ACTION}' specified"
+			exit 1
+	esac
+	if [[ "$ACTION" == "set" ]] && [[ -z "$KEY_VALUE" ]]; then
+		echoc -error "Missing value"
+		exit 1
+	fi
+fi
+
+if [[ "$ACTION" =~ ^(dump|print)$ ]]; then
+	/usr/libexec/PlistBuddy -c "Print" "$PLIST_FILE" | grep -v "File Doesn't Exist" 2> /dev/null
+	exit 0
+fi
+
+CURRENT_VALUE=
+if [[ -f "$PLIST_FILE" ]]; then
+	CURRENT_VALUE="$(/usr/libexec/PlistBuddy -c "Print :$KEY" "$PLIST_FILE" | grep -v "File Doesn't Exist" 2> /dev/null)"
+fi
+
+if [[ "$ACTION" == "get" ]]; then
+	echo "$CURRENT_VALUE"
+	exit 0
+fi
+
+if [[ "$ACTION" == "delete" ]]; then
+	if [[ -f "$PLIST_FILE" ]] && [[ -n "$CURRENT_VALUE" ]]; then
+		/usr/libexec/PlistBuddy -c "Delete :$KEY" "$PLIST_FILE" | grep -v "File Doesn't Exist" 2> /dev/null
+	fi
+	exit 0
+fi
+
+if [[ "$CURRENT_VALUE" == "$KEY_VALUE" ]]; then
+	# Nothing to do; exit
+	exit 0
+fi
+
+mkdir -p "$(dirname "$PLIST_FILE")"
+if [[ -n "$CURRENT_VALUE" ]]; then
+	/usr/libexec/PlistBuddy -c "Set :$KEY '$KEY_VALUE'" "$PLIST_FILE" | grep -v "File Doesn't Exist" 2> /dev/null
+else
+	/usr/libexec/PlistBuddy -c "Add :$KEY $KEY_TYPE '$KEY_VALUE'" "$PLIST_FILE" | grep -v "File Doesn't Exist" 2> /dev/null
+fi

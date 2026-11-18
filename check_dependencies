@@ -1,0 +1,39 @@
+# shellcheck shell=bash
+
+[ -n "${__CHECK_DEPENDENCIES_SOURCED:-}" ] && return
+__CHECK_DEPENDENCIES_SOURCED=1
+
+[[ -n "${VERBOSE:-}" ]] && echo "Loading ${BASH_SOURCE[0]} from ${BASH_SOURCE[1]}:${BASH_LINENO[0]}"
+
+# We cannot load any other dependencies from here; everything calls into this
+
+FAIL=false
+if (( BASH_VERSINFO[0] < 4 )); then
+	echo -e "\033[0;31mOld MacOS version of bash detected. Please install the updated bash package.\033[0m"
+	FAIL=true
+fi
+TOOLS_TO_CHECK=(
+	"realpath:coreutils" "basename:coreutils" "dirname:coreutils"
+	"awk:gawk"
+	"xargs:findutils" "find:findutils"
+	"sed:gnu-sed"
+	"tar:gnu-tar"
+	"grep:grep"
+)
+for line in "${TOOLS_TO_CHECK[@]}"; do
+	IFS=":" read -r cmd package <<< "$line"
+
+	if ! "$cmd" --version >/dev/null 2>&1; then
+		echo -e "\033[0;31mOld MacOS version of $cmd detected. Please install the $package package.\033[0m"
+		FAIL=true
+	fi
+done
+
+$FAIL && exit 1
+
+[[ -n "${VERBOSE:-}" ]] && echo "Dependencies passed"
+
+unset FAIL
+unset TOOLS_TO_CHECK
+
+return 0

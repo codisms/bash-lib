@@ -1,92 +1,113 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
 
+[ -n "${__SAFE_CREATE_SYMLINK_SOURCED:-}" ] && return
+__SAFE_CREATE_SYMLINK_SOURCED=1
+
+[[ -n "${VERBOSE:-}" ]] && echo "Loading ${BASH_SOURCE[0]} from ${BASH_SOURCE[1]}:${BASH_LINENO[0]}"
+
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/check_dependencies"
+# shellcheck disable=SC1091
 source "$(dirname "${BASH_SOURCE[0]}")/echoc"
-source "$(dirname "${BASH_SOURCE[0]}")/abspath"
 
-function safe_create_symlink {
-    local dry_run=false
+
+_safe_create_symlink__set_permissions() {
+	set -e
+
+	local src; src="$(realpath -sm "$1")" || return 1
+	local target; target="$(realpath -sm "$2")" || return 1
+
+	if [[ -d "${src}" ]]; then
+		chmod 700 "${target}" || return 1
+		chmod -R u+rw,o-rwx "${target}" || return 1
+	else
+		chmod u+rw,o-rwx "${target}" || return 1
+	fi
+
+	return 0
+}
+
+safe_create_symlink() {
 	local no_backup=false
-    local extension=$(date +"%Y%m%d.%H%M")
-    local positional_args=()
+	local skip_if_exists=false
+	local positional_args=()
 
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
 			--no-backup)
 				no_backup=true
 				shift
 				;;
-            --extension|--ext)
-                if [ -n "$2" ] && [ "${2:0:1}" != "-" ]; then
-                    extension="$2"
-                    shift 2
-                else
-                    echoc -error "Error: Argument for $1 is missing"
-                    exit 1
-                fi
-                ;;
-            --dry-run)
-                dry_run=true
-                shift
-                ;;
-            *)
-                positional_args+=("$1")
-                shift
-                ;;
-        esac
-    done
+			--skip-if-exists)
+				skip_if_exists=true
+				shift
+				;;
+			*)
+				positional_args+=("$1")
+				shift
+				;;
+		esac
+	done
 
-    set -- "${positional_args[@]}" # restore positional parameters
+	set -- "${positional_args[@]}" # restore positional parameters
 
-    local lead=""
-    if $dry_run; then
-        lead="(dry-run) "
-    fi
 
-    local src="$(abspath "$1")"
-    local target="$(abspath "$2")"
-
-	if [[ ! -e "$src" ]]; then
-		echoc -purple "$lead" -error "Source file ${src} does not exist"
+	if [[ -z "$1" ]]; then
+		echoc -error "Source file/directory is missing"
+		return 1
+	fi
+	if [[ -z "$2" ]]; then
+		echoc -error "Destination file/directory is missing"
 		return 1
 	fi
 
-	# local src_path="$(dirname "$src")"
-	# local src_name="$(basename "$src")"
-	# local target_path="$(dirname "$target")"
-	# local target_name="$(basename "$target")"
-    # local relative_src_path="$(relative_path "$target_path" "$src_path")"
-	# src="${relative_src_path}/${src_name}"
+	local src; src="$(realpath -sm "$1")" || return 1
+	local target; target="$(realpath -sm "$2")" || return 1
 
-	# echo "src_name = $src_name"
-	# echo "src_path = $src_path"
-	# echo "target_name = $target_name"
-	# echo "target_path = $target_path"
-	# echo "relative_src_path = $relative_src_path"
-	# echo "src = $src"
-	# echo "target = $target"
+	if [[ ! -e "$src" ]]; then
+		echoc -error "Source file ${src} does not exist"
+		return 1
+	fi
+
+	if $skip_if_exists && [[ -e "$target" ]]; then
+		# Do nothing
+		return 0
+	fi
 
 	if [[ -L "$target" || -e "$target" ]]; then
 		if [[ -L "$target" && "$(readlink -f "$src")" == "$(readlink -f "$target")" ]]; then
-			echoc -purple "$lead" -nocolor "Link " -yellow "$target" -nocolor " already exists; skipping"
+			_safe_create_symlink__set_permissions "$src" "$target" || return 1
+
+			echo "Link $target already exists; skipping"
 			return 0
 		fi
 
-		if $no_backup; then
-			echoc -purple "$lead" -nocolor "Deleting " -yellow "$target"
-			if ! $dry_run; then
-				rm -rf "$target"
-			fi
+		if [[ -L "$target" && ! -e "$target" ]]; then
+			echo "Deleting $target since it's a broken link"
+			rm -rf "$target" || return 1
 		else
-			echoc -purple "$lead" -nocolor "Moving " -yellow "$target" -nocolor " to " -yellow "${target}.${extension}"
-			if ! $dry_run; then
-				mv "$target" "${target}.${extension}"
+			if $no_backup; then
+				echo "Deleting $target"
+				rm -rf "$target" || return 1
+			else
+				if [[ -L "${target}.orig" || -e "${target}.orig" ]]; then
+					echoc -error "Backup ${target}.orig already exists; returning"
+					return 1
+				fi
+
+				echo "Moving $target to ${target}.orig"
+				mv "$target" "${target}.orig" || return 1
 			fi
 		fi
 	fi
 
-	echo -purple "$lead" -nocolor "Creating link from " -yellow "$src" -nocolor " to " -yellow "$target"
-	if ! $dry_run; then
-		ln -sn "$src" "$target"
-	fi
-	return $?
+	echo "Creating link from $src to $target"
+	mkdir -p "$(dirname "$target")" || return 1
+	ln -sn "$src" "$target" || return 1
+
+	_safe_create_symlink__set_permissions "$src" "$target" || return 1
+
+	return 0
 }
+
+return 0

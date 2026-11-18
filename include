@@ -1,0 +1,25 @@
+# shellcheck shell=bash
+
+[ -n "${__INCLUDE_SOURCED:-}" ] && return
+__INCLUDE_SOURCED=1
+
+[[ -n "${VERBOSE:-}" ]] && echo "Loading ${BASH_SOURCE[0]}"
+
+# Check the dependencies first
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/check_dependencies"
+
+# Then load everything else
+for file in "$(dirname "${BASH_SOURCE[0]}")"/*; do
+	if [[ ! "$(basename "$file")" =~ ^($(basename "${BASH_SOURCE[0]}")|check_dependencies)$ ]] && [[ -f "$file" ]]; then
+		[[ -n "${VERBOSE:-}" ]] && echo " > Loading $file"
+		# shellcheck disable=SC1090
+		source "$file"
+	else
+		[[ -n "${VERBOSE:-}" ]] && echo " > Skipping file $file"
+	fi
+done
+
+[[ -n "${VERBOSE:-}" ]] && echo " > Done loading"
+
+return 0

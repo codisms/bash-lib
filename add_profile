@@ -1,0 +1,90 @@
+# shellcheck shell=bash
+
+[ -n "${__ADD_PROFILE_SOURCED:-}" ] && return
+__ADD_PROFILE_SOURCED=1
+
+[[ -n "${VERBOSE:-}" ]] && echo "Loading ${BASH_SOURCE[0]} from ${BASH_SOURCE[1]}:${BASH_LINENO[0]}"
+
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/check_dependencies"
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/echoc"
+# shellcheck disable=SC1091
+source "$(dirname "${BASH_SOURCE[0]}")/safe_create_symlink"
+
+
+add_profile_env() {
+	local text="$1"
+	local filename="$2"
+
+	if [[ -z "$text" ]]; then
+		echoc -error "Missing text to output"
+		return 1
+	fi
+	if [[ -z "$filename" ]]; then
+		filename=$(uuidgen)
+	fi
+
+	local env_dir="${HOME}/.config/profile/env"
+	mkdir -p "${env_dir}" || return 1
+
+	echo "$text" > "${env_dir}/${filename}"
+
+	return 0
+}
+
+add_profile_env_symlink() {
+	local src; src="$(realpath -sm "$1")" || return 1
+
+	if [[ ! -f "$src" ]]; then
+		echoc -error "Target environment file does not exist: $src"
+		return 1
+	fi
+
+	local env_dir="${HOME}/.config/profile/env"
+	mkdir -p "${env_dir}" || return 1
+
+	local target; target="${env_dir}/$(basename "$src")" || return 1
+	safe_create_symlink --no-backup "$src" "$target" || return 1
+
+	return 0
+}
+
+add_profile_rc() {
+	local text="$1"
+	local filename="$2"
+
+	if [[ -z "$text" ]]; then
+		echoc -error "Missing text to output"
+		return 1
+	fi
+	if [[ -z "$filename" ]]; then
+		filename=$(uuidgen)
+	fi
+
+	local env_dir="${HOME}/.config/profile/rc"
+	mkdir -p "${env_dir}" || return 1
+
+	echo "$text" > "${env_dir}/${filename}"
+
+	return 0
+}
+
+add_profile_rc_symlink() {
+	local src; src="$(realpath -sm "$1")" || return 1
+
+	if [[ ! -f "$src" ]]; then
+		echoc -error "Target environment file does not exist: $src"
+		return 1
+	fi
+
+	local env_dir="${HOME}/.config/profile/rc"
+	mkdir -p "${env_dir}" || return 1
+
+	local target; target="${env_dir}/$(basename "$src")" || return 1
+	safe_create_symlink --no-backup "$src" "$target" || return 1
+
+	return 0
+}
+
+return 0
